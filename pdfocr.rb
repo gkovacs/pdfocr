@@ -11,6 +11,7 @@ deletedir = true
 deletefiles = true
 language = 'eng'
 checklang = false
+tmp = nil
 
 optparse = OptionParser.new do |opts|
 opts.banner = <<-eos
