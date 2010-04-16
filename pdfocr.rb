@@ -1,0 +1,236 @@
+#!/usr/bin/ruby
+
+require 'optparse'
+require 'tmpdir'
+
+appname = 'pdfocr'
+version = [0,1]
+infile = nil
+outfile = nil
+deletedir = true
+deletefiles = true
+language = 'eng'
+checklang = false
+
+optparse = OptionParser.new do |opts|
+opts.banner = <<-eos
+Usage: #{appname} -i input.pdf -o output.pdf
+#{appname} adds text to PDF files using the cuneiform OCR software
+eos
+
+	opts.on("-i", "--input [FILE]", "Specify input PDF file") do |fn|
+		infile = fn
+	end
+	
+	opts.on("-o", "--output [FILE]", "Specify output PDF file") do |fn|
+		outfile = fn
+	end
+	
+	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") do |fn|
+		language = fn
+		checklang = true
+	end
+	
+	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") do |fn|
+		deletedir = false
+		tmp = fn
+	end
+	
+	opts.on("-k", "--keep", "Keep temporary files around") do
+		deletefiles = false
+	end
+
+	opts.on_tail("-h", "--help", "Show this message") do
+		puts opts
+		exit
+	end
+
+	opts.on_tail("-v", "--version", "Show version") do
+		puts version.join('.')
+		exit
+	end
+
+end
+
+optparse.parse!(ARGV)
+
+if not infile or infile == ""
+	puts optparse
+	puts
+	puts "Need to specify an input PDF file"
+	exit
+end
+
+if infile[-3..-1] != "pdf"
+	puts "Input PDF file #{infile} should have a PDF extension"
+	exit
+end
+
+#baseinfile = infile[0..-5]
+
+#if not baseinfile or baseinfile == ""
+#	puts "Input file #{infile} needs to have a name, not just an extension"
+#	exit
+#end
+
+if not File.file?(infile)
+	puts "Input file #{infile} does not exist"
+	exit
+end
+
+if not outfile or outfile == ""
+	puts optparse
+	puts
+	puts "Need to specify an output PDF file"
+	exit
+end
+
+if outfile[-3..-1] != "pdf"
+	puts "Output PDF file should have a PDF extension"
+	exit
+end
+
+if outfile == infile
+	puts "Output PDF file should not be the same as the input PDF file"
+	exit
+end
+
+if File.file?(outfile)
+	puts "Output file #{outfile} already exists"
+	exit
+end
+
+if not language or language == ""
+	puts "Need to specify a language"
+end
+
+if `which pdftk` == ""
+	puts "pdftk command is missing. Install the pdftk package"
+	exit
+end
+
+if `which convert` == ""
+	puts "convert command is missing. Install the imagemagick package"
+	exit
+end
+
+if `which cuneiform` == ""
+	puts "cuneiform command is missing. Install the cuneiform package"
+	exit
+end
+
+if `which hocr2pdf` == ""
+	puts "hocr2pdf command is missing. Install the exactimage package"
+	exit
+end
+
+if not deletedir
+	if not File.directory?(tmp)
+		puts "Working directory #{tmp} does not exist"
+		exit
+	end
+else
+	tmp = Dir.mktmpdir
+end
+
+if checklang
+	langlist = []
+	begin
+		langlist = `cuneiform -l`.split("\n")[-1].split(":")[-1].delete(".").split(" ")
+	rescue
+		puts "Unable to list supported languages from cuneiform"
+	end
+	if langlist and not langlist.empty?()
+		if not langlist.include?(language)
+			puts "Language #{language} is not supported by cuneiform"
+			exit
+		end
+	end
+end
+
+puts "Input file is #{infile}"
+puts "Output file is #{outfile}"
+puts "Using working dir #{tmp}"
+
+puts "Getting info from PDF file"
+
+puts
+
+pdfinfo = `pdftk #{infile} dump_data`
+
+if not pdfinfo or pdfinfo == ""
+	puts "Error: didn't get info from pdftk #{infile} dump_data"
+	exit
+end
+
+puts pdfinfo
+
+puts
+
+begin
+	pagenum = pdfinfo.split("\n")[-1].split(" ")[-1].to_i
+rescue
+	puts "Error: didn't get page count for #{infile} from pdftk"
+	exit
+end
+
+if pagenum == 0
+	puts "Error: there are 0 pages in the input PDF file #{infile}"
+	exit
+end
+
+puts "Converting #{pagenum} pages"
+
+numdigits = pagenum.to_s.length
+
+1.upto(pagenum) do |i|
+	puts "=========="
+	puts "Extracting page #{i}"
+	basefn = tmp+"/"+i.to_s.rjust(numdigits, '0')
+	errout = `pdftk #{infile} cat #{i} output #{basefn+'.pdf'}`
+	if not File.file?(basefn+'.pdf')
+		puts errout
+		puts "Error while extracting page #{i}"
+		next
+	end
+	puts "Converting page #{i} to tiff"
+	errout = `convert #{basefn+'.pdf'} #{basefn+'.tiff'}`
+	if not File.file?(basefn+'.tiff')
+		puts errout
+		puts "Error while converting page #{i} to tiff"
+		next
+	end
+	puts "Running OCR on page #{i}"
+	errout = `cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.tiff'}`
+	if not File.file?(basefn+'.html')
+		puts errout
+		puts "Error while running OCR on page #{i}"
+		next
+	end
+	puts "Embedding text into PDF for page #{i}"
+	errout = `hocr2pdf -i #{basefn+'.tiff'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}`
+	if not File.file?(basefn+'-new.pdf')
+		puts errout
+		puts "Error while embedding text into PDF for page #{i}"
+		next
+	end
+end
+
+puts "Merging together PDF files into #{outfile}"
+
+puts `pdftk #{tmp+'/'+'*-new.pdf'} cat output #{outfile}`
+
+if deletefiles
+	puts "Cleaning up temporary files"
+	Dir.foreach(tmp) do |fn|
+		if fn == "." or fn == ".."
+			next
+		end
+		File.delete(tmp+"/"+fn)
+	end
+end
+
+if deletefiles and deletedir
+	Dir.delete(tmp)
+end
+
