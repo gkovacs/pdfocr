@@ -3,38 +3,22 @@
 require 'optparse'
 require 'tmpdir'
 
-#module Enumerable
-#	def comprehend( &block )
-#		block ? map( &block ).compact : self
-#	end
-#end
-
 def sh(c)
 	outl = []
-	IO.popen(c) do |f|
+	IO.popen(c) { |f|
 		while not f.eof?
 			tval = f.gets
 			puts tval
 			outl.push(tval)
 		end
-	end
+	}
 	return outl.join("")
 end
 
-#def cat(c)
-#	outl = []
-#	f = File.open(c, "r")
-#	f.each do |line|
-#		outl.push(line)
-#	end
-#	f.close
-#	return outl.join("")
-#end
-
 def writef(fn, c)
-	File.open(fn, "w") do |f|
+	File.open(fn, "w") { |f|
 		f.puts(c)
-	end
+	}
 end
 
 appname = 'pdfocr'
@@ -48,49 +32,49 @@ checklang = false
 tmp = nil
 width = 2048
 
-optparse = OptionParser.new do |opts|
+optparse = OptionParser.new { |opts|
 opts.banner = <<-eos
 Usage: #{appname} -i input.pdf -o output.pdf
 #{appname} adds text to PDF files using the cuneiform OCR software
 eos
 
-	opts.on("-i", "--input [FILE]", "Specify input PDF file") do |fn|
+	opts.on("-i", "--input [FILE]", "Specify input PDF file") { |fn|
 		infile = fn
-	end
+	}
 	
-	opts.on("-o", "--output [FILE]", "Specify output PDF file") do |fn|
+	opts.on("-o", "--output [FILE]", "Specify output PDF file") { |fn|
 		outfile = fn
-	end
+	}
 	
-	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") do |fn|
+	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") { |fn|
 		language = fn
 		checklang = true
-	end
+	}
 	
-	#opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") do |fn|
+	#opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") { |fn|
 	#	width = fn
-	#end
+	#}
 	
-	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") do |fn|
+	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") { |fn|
 		deletedir = false
 		tmp = fn
-	end
+	}
 	
-	opts.on("-k", "--keep", "Keep temporary files around") do
+	opts.on("-k", "--keep", "Keep temporary files around") {
 		deletefiles = false
-	end
+	}
 
-	opts.on_tail("-h", "--help", "Show this message") do
+	opts.on_tail("-h", "--help", "Show this message") {
 		puts opts
 		exit
-	end
+	}
 
-	opts.on_tail("-v", "--version", "Show version") do
+	opts.on_tail("-v", "--version", "Show version") {
 		puts version.join('.')
 		exit
-	end
+	}
 
-end
+}
 
 optparse.parse!(ARGV)
 
@@ -169,11 +153,6 @@ if `which cuneiform` == ""
 	exit
 end
 
-#if `which pnmfile` == ""
-#	puts "pnmfile command is missing. Install the netpbm package"
-#	exit
-#end
-
 if `which hocr2pdf` == ""
 	puts "hocr2pdf command is missing. Install the exactimage package"
 	exit
@@ -240,7 +219,7 @@ numdigits = pagenum.to_s.length
 
 Dir.chdir(tmp+"/") {
 
-1.upto(pagenum) {|i|
+1.upto(pagenum) { |i|
 	puts "=========="
 	puts "Extracting page #{i}"
 	basefn = i.to_s.rjust(numdigits, '0')
@@ -255,15 +234,6 @@ Dir.chdir(tmp+"/") {
 		puts "Error while converting page #{i} to ppm"
 		next
 	end
-	#xres,yres = 0,0
-	#ppminf = sh "pnmfile #{basefn+'.ppm'}"
-	#begin
-	#	xres,yres = ppminf.split(",")[-1].split(" ").comprehend{|x| x.to_i if x.to_i != 0}[0..1]
-	#	puts "Resolution is #{xres} by #{yres}"
-	#rescue
-	#	puts "Error while extracting ppm resolution for page #{i}"
-	#	xres,yres = 0,0
-	#end
 	puts "Running OCR on page #{i}"
 	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
 	if not File.file?(basefn+'.hocr')
@@ -271,11 +241,7 @@ Dir.chdir(tmp+"/") {
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
-	#if xres == 0 or yres == 0
 	sh "hocr2pdf -i #{basefn+'.ppm'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
-	#else
-	#sh "hocr2pdf -i #{basefn+'.ppm'} -r #{xres}x#{yres} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
-	#end
 	if not File.file?(basefn+'-new.pdf')
 		puts "Error while embedding text into PDF for page #{i}"
 		next
@@ -294,12 +260,12 @@ sh "pdftk #{tmp+'/merged.pdf'} update_info #{tmp+'/pdfinfo.txt'} output #{outfil
 
 if deletefiles
 	puts "Cleaning up temporary files"
-	Dir.foreach(tmp) do |fn|
+	Dir.foreach(tmp) { |fn|
 		if fn == "." or fn == ".."
 			next
 		end
 		File.delete(tmp+"/"+fn)
-	end
+	}
 end
 
 if deletefiles and deletedir
