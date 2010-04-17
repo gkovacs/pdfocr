@@ -1,0 +1,9 @@
+pdfocr adds an OCR text layer to scanned PDF files, allowing them to be searched. It currently depends on Ruby 1.8.7 or above, and relies on cuneiform for image recognition.
+
+To use, run:
+
+pdfocr -i input.pdf -o output.pdf
+
+For more details, see the manpage.
+
+pdfocr was written by Geza Kovacs
