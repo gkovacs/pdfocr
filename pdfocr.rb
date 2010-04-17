@@ -3,6 +3,34 @@
 require 'optparse'
 require 'tmpdir'
 
+def sh(c)
+	outl = []
+	IO.popen(c) do |f|
+		while not f.eof?
+			tval = f.gets
+			puts tval
+			outl.push(tval)
+		end
+	end
+	return outl.join("")
+end
+
+def cat(c)
+	outl = []
+	f = File.open(c, "r")
+	f.each do |line|
+		outl.push(line)
+	end
+	f.close
+	return outl.join("")
+end
+
+def writef(fn, c)
+	File.open(fn, "w") do |f|
+		f.puts(c)
+	end
+end
+
 appname = 'pdfocr'
 version = [0,1]
 infile = nil
@@ -157,14 +185,12 @@ puts "Getting info from PDF file"
 
 puts
 
-pdfinfo = `pdftk #{infile} dump_data`
+pdfinfo = sh "pdftk #{infile} dump_data"
 
 if not pdfinfo or pdfinfo == ""
 	puts "Error: didn't get info from pdftk #{infile} dump_data"
 	exit
 end
-
-puts pdfinfo
 
 puts
 
@@ -188,30 +214,26 @@ numdigits = pagenum.to_s.length
 	puts "=========="
 	puts "Extracting page #{i}"
 	basefn = tmp+"/"+i.to_s.rjust(numdigits, '0')
-	errout = `pdftk #{infile} cat #{i} output #{basefn+'.pdf'}`
+	sh "pdftk #{infile} cat #{i} output #{basefn+'.pdf'}"
 	if not File.file?(basefn+'.pdf')
-		puts errout
 		puts "Error while extracting page #{i}"
 		next
 	end
 	puts "Converting page #{i} to tiff"
-	errout = `convert #{basefn+'.pdf'} #{basefn+'.tiff'}`
+	sh "convert #{basefn+'.pdf'} #{basefn+'.tiff'}"
 	if not File.file?(basefn+'.tiff')
-		puts errout
 		puts "Error while converting page #{i} to tiff"
 		next
 	end
 	puts "Running OCR on page #{i}"
-	errout = `cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.tiff'}`
+	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.tiff'}"
 	if not File.file?(basefn+'.html')
-		puts errout
 		puts "Error while running OCR on page #{i}"
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
-	errout = `hocr2pdf -i #{basefn+'.tiff'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}`
+	sh "hocr2pdf -i #{basefn+'.tiff'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
 	if not File.file?(basefn+'-new.pdf')
-		puts errout
 		puts "Error while embedding text into PDF for page #{i}"
 		next
 	end
@@ -219,7 +241,7 @@ end
 
 puts "Merging together PDF files into #{outfile}"
 
-puts `pdftk #{tmp+'/'+'*-new.pdf'} cat output #{outfile}`
+sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{outfile}"
 
 if deletefiles
 	puts "Cleaning up temporary files"
