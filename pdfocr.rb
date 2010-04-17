@@ -3,6 +3,12 @@
 require 'optparse'
 require 'tmpdir'
 
+#module Enumerable
+#	def comprehend( &block )
+#		block ? map( &block ).compact : self
+#	end
+#end
+
 def sh(c)
 	outl = []
 	IO.popen(c) do |f|
@@ -15,15 +21,15 @@ def sh(c)
 	return outl.join("")
 end
 
-def cat(c)
-	outl = []
-	f = File.open(c, "r")
-	f.each do |line|
-		outl.push(line)
-	end
-	f.close
-	return outl.join("")
-end
+#def cat(c)
+#	outl = []
+#	f = File.open(c, "r")
+#	f.each do |line|
+#		outl.push(line)
+#	end
+#	f.close
+#	return outl.join("")
+#end
 
 def writef(fn, c)
 	File.open(fn, "w") do |f|
@@ -61,9 +67,9 @@ eos
 		checklang = true
 	end
 	
-	opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") do |fn|
-		width = fn
-	end
+	#opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") do |fn|
+	#	width = fn
+	#end
 	
 	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") do |fn|
 		deletedir = false
@@ -153,11 +159,6 @@ if `which pdftk` == ""
 	exit
 end
 
-if `which pdfinfo` == ""
-	puts "pdfinfo command is missing. Install the poppler-utils package"
-	exit
-end
-
 if `which pdftoppm` == ""
 	puts "pdftoppm command is missing. Install the poppler-utils package"
 	exit
@@ -168,10 +169,10 @@ if `which cuneiform` == ""
 	exit
 end
 
-if `which pnmfile` == ""
-	puts "pnmfile command is missing. Install the netpbm package"
-	exit
-end
+#if `which pnmfile` == ""
+#	puts "pnmfile command is missing. Install the netpbm package"
+#	exit
+#end
 
 if `which hocr2pdf` == ""
 	puts "hocr2pdf command is missing. Install the exactimage package"
@@ -231,13 +232,15 @@ if pagenum == 0
 	exit
 end
 
+writef(tmp+"/pdfinfo.txt", pdfinfo)
+
 puts "Converting #{pagenum} pages"
 
 numdigits = pagenum.to_s.length
 
-Dir.chdir(tmp+"/") do
+Dir.chdir(tmp+"/") {
 
-1.upto(pagenum) do |i|
+1.upto(pagenum) {|i|
 	puts "=========="
 	puts "Extracting page #{i}"
 	basefn = i.to_s.rjust(numdigits, '0')
@@ -247,12 +250,20 @@ Dir.chdir(tmp+"/") do
 		next
 	end
 	puts "Converting page #{i} to ppm"
-	`pdftoppm #{basefn+'.pdf'} > #{basefn+'.ppm'}`
+	sh "pdftoppm #{basefn+'.pdf'} > #{basefn+'.ppm'}"
 	if not File.file?(basefn+'.ppm')
 		puts "Error while converting page #{i} to ppm"
 		next
 	end
-	
+	#xres,yres = 0,0
+	#ppminf = sh "pnmfile #{basefn+'.ppm'}"
+	#begin
+	#	xres,yres = ppminf.split(",")[-1].split(" ").comprehend{|x| x.to_i if x.to_i != 0}[0..1]
+	#	puts "Resolution is #{xres} by #{yres}"
+	#rescue
+	#	puts "Error while extracting ppm resolution for page #{i}"
+	#	xres,yres = 0,0
+	#end
 	puts "Running OCR on page #{i}"
 	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
 	if not File.file?(basefn+'.hocr')
@@ -260,18 +271,26 @@ Dir.chdir(tmp+"/") do
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
+	#if xres == 0 or yres == 0
 	sh "hocr2pdf -i #{basefn+'.ppm'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
+	#else
+	#sh "hocr2pdf -i #{basefn+'.ppm'} -r #{xres}x#{yres} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
+	#end
 	if not File.file?(basefn+'-new.pdf')
 		puts "Error while embedding text into PDF for page #{i}"
 		next
 	end
-end
+}
 
-end
+}
 
-puts "Merging together PDF files into #{outfile}"
+puts "Merging together PDF files"
 
-sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{outfile}"
+sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.pdf'}"
+
+puts "Updating PDF info for #{outfile}"
+
+sh "pdftk #{tmp+'/merged.pdf'} update_info #{tmp+'/pdfinfo.txt'} output #{outfile}"
 
 if deletefiles
 	puts "Cleaning up temporary files"
