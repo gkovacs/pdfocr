@@ -41,8 +41,23 @@ def writef(fn, c)
 	}
 end
 
+def rmdir(dirn)
+	Dir.foreach(dirn) { |fn|
+		if fn == "." or fn == ".."
+			next
+		end
+		fn = File.expand_path(dirn+"/"+fn)
+		if File.directory?(fn)
+			rmdir(fn)
+		else
+			File.delete(fn)
+		end
+	}
+	Dir.delete(dirn)
+end
+
 appname = 'pdfocr'
-version = [0,1]
+version = [0,1,1]
 infile = nil
 outfile = nil
 deletedir = true
@@ -50,7 +65,6 @@ deletefiles = true
 language = 'eng'
 checklang = false
 tmp = nil
-width = 2048
 
 optparse = OptionParser.new { |opts|
 opts.banner = <<-eos
@@ -70,10 +84,6 @@ eos
 		language = fn
 		checklang = true
 	}
-	
-	#opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") { |fn|
-	#	width = fn
-	#}
 	
 	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") { |fn|
 		deletedir = false
@@ -153,11 +163,6 @@ if not language or language == ""
 	exit
 end
 
-if not width or width == 0
-	puts "Need to specify a width"
-	exit
-end
-
 if `which pdftk` == ""
 	puts "pdftk command is missing. Install the pdftk package"
 	exit
@@ -182,6 +187,14 @@ if not deletedir
 	if not File.directory?(tmp)
 		puts "Working directory #{tmp} does not exist"
 		exit
+	else
+		tmp = File.expand_path(tmp)+"/pdfocr"
+		if File.directory?(tmp)
+			puts "Directory #{tmp} already exists - remove it"
+			exit
+		else
+			Dir.mkdir(tmp)
+		end
 	end
 else
 	tmp = Dir.mktmpdir
@@ -280,15 +293,7 @@ sh "pdftk #{tmp+'/merged.pdf'} update_info #{tmp+'/pdfinfo.txt'} output #{outfil
 
 if deletefiles
 	puts "Cleaning up temporary files"
-	Dir.foreach(tmp) { |fn|
-		if fn == "." or fn == ".."
-			next
-		end
-		File.delete(tmp+"/"+fn)
-	}
+	rmdir(tmp)
 end
 
-if deletefiles and deletedir
-	Dir.delete(tmp)
-end
 
