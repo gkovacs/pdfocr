@@ -40,6 +40,7 @@ deletefiles = true
 language = 'eng'
 checklang = false
 tmp = nil
+width = 2048
 
 optparse = OptionParser.new do |opts|
 opts.banner = <<-eos
@@ -58,6 +59,10 @@ eos
 	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") do |fn|
 		language = fn
 		checklang = true
+	end
+	
+	opts.on("-w", "--width [PIXELS]", "Specify image width in pixels") do |fn|
+		width = fn
 	end
 	
 	opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") do |fn|
@@ -107,6 +112,8 @@ if not File.file?(infile)
 	exit
 end
 
+infile = File.expand_path(infile)
+
 if not outfile or outfile == ""
 	puts optparse
 	puts
@@ -129,8 +136,16 @@ if File.file?(outfile)
 	exit
 end
 
+outfile = File.expand_path(outfile)
+
 if not language or language == ""
 	puts "Need to specify a language"
+	exit
+end
+
+if not width or width == 0
+	puts "Need to specify a width"
+	exit
 end
 
 if `which pdftk` == ""
@@ -138,13 +153,23 @@ if `which pdftk` == ""
 	exit
 end
 
-if `which convert` == ""
-	puts "convert command is missing. Install the imagemagick package"
+if `which pdfinfo` == ""
+	puts "pdfinfo command is missing. Install the poppler-utils package"
+	exit
+end
+
+if `which pdftoppm` == ""
+	puts "pdftoppm command is missing. Install the poppler-utils package"
 	exit
 end
 
 if `which cuneiform` == ""
 	puts "cuneiform command is missing. Install the cuneiform package"
+	exit
+end
+
+if `which pnmfile` == ""
+	puts "pnmfile command is missing. Install the netpbm package"
 	exit
 end
 
@@ -210,33 +235,38 @@ puts "Converting #{pagenum} pages"
 
 numdigits = pagenum.to_s.length
 
+Dir.chdir(tmp+"/") do
+
 1.upto(pagenum) do |i|
 	puts "=========="
 	puts "Extracting page #{i}"
-	basefn = tmp+"/"+i.to_s.rjust(numdigits, '0')
+	basefn = i.to_s.rjust(numdigits, '0')
 	sh "pdftk #{infile} cat #{i} output #{basefn+'.pdf'}"
 	if not File.file?(basefn+'.pdf')
 		puts "Error while extracting page #{i}"
 		next
 	end
-	puts "Converting page #{i} to tiff"
-	sh "convert #{basefn+'.pdf'} #{basefn+'.tiff'}"
-	if not File.file?(basefn+'.tiff')
-		puts "Error while converting page #{i} to tiff"
+	puts "Converting page #{i} to ppm"
+	`pdftoppm #{basefn+'.pdf'} > #{basefn+'.ppm'}`
+	if not File.file?(basefn+'.ppm')
+		puts "Error while converting page #{i} to ppm"
 		next
 	end
+	
 	puts "Running OCR on page #{i}"
-	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.tiff'}"
-	if not File.file?(basefn+'.html')
+	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
+	if not File.file?(basefn+'.hocr')
 		puts "Error while running OCR on page #{i}"
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
-	sh "hocr2pdf -i #{basefn+'.tiff'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
+	sh "hocr2pdf -i #{basefn+'.ppm'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
 	if not File.file?(basefn+'-new.pdf')
 		puts "Error while embedding text into PDF for page #{i}"
 		next
 	end
+end
+
 end
 
 puts "Merging together PDF files into #{outfile}"
