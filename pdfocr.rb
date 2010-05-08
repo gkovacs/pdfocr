@@ -65,6 +65,7 @@ deletefiles = true
 language = 'eng'
 checklang = false
 tmp = nil
+usecuneiform = false
 
 optparse = OptionParser.new { |opts|
 opts.banner = <<-eos
@@ -78,6 +79,10 @@ eos
 	
 	opts.on("-o", "--output [FILE]", "Specify output PDF file") { |fn|
 		outfile = fn
+	}
+	
+	opts.on("-c", "--cuneiform", "Use cuneiform instead of ocropus") {
+		usecuneiform = true
 	}
 	
 	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") { |fn|
@@ -173,9 +178,16 @@ if `which pdftoppm` == ""
 	exit
 end
 
-if `which cuneiform` == ""
-	puts "cuneiform command is missing. Install the cuneiform package"
-	exit
+if usecuneiform
+	if `which cuneiform` == ""
+		puts "cuneiform command is missing. Install the cuneiform package"
+		exit
+	end
+else
+	if `which ocroscript` == ""
+		puts "ocroscript command is missing. Install the ocropus package"
+		exit
+	end
 end
 
 if `which hocr2pdf` == ""
@@ -268,7 +280,11 @@ Dir.chdir(tmp+"/") {
 		next
 	end
 	puts "Running OCR on page #{i}"
-	sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
+	if usecuneiform
+		sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
+	else
+		sh "ocroscript recognize #{basefn+'.ppm'} > #{basefn+'.hocr'} "
+	end
 	if not File.file?(basefn+'.hocr')
 		puts "Error while running OCR on page #{i}"
 		next
