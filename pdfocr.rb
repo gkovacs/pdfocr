@@ -23,8 +23,16 @@
 require 'optparse'
 require 'tmpdir'
 
-def sh(c)
+def shell_escape(s)
+    "'" + s.gsub("'", "'\\''") + "'"
+end
+
+def sh(c, *args)
 	outl = []
+    if args.length > 0
+        c = shell_escape(c) + ' '
+        c << args.map {|w| shell_escape(w)}.join(' ')
+    end
 	IO.popen(c) { |f|
 		while not f.eof?
 			tval = f.gets
@@ -235,7 +243,7 @@ puts "Getting info from PDF file"
 
 puts
 
-pdfinfo = sh "pdftk #{infile} dump_data"
+pdfinfo = sh "pdftk", infile, "dump_data"
 
 if not pdfinfo or pdfinfo == ""
 	puts "Error: didn't get info from pdftk #{infile} dump_data"
@@ -268,29 +276,30 @@ Dir.chdir(tmp+"/") {
 	puts "=========="
 	puts "Extracting page #{i}"
 	basefn = i.to_s.rjust(numdigits, '0')
-	sh "pdftk #{infile} cat #{i} output #{basefn+'.pdf'}"
+	sh "pdftk", infile, "cat", "#{i}", "output", basefn+'.pdf'
 	if not File.file?(basefn+'.pdf')
 		puts "Error while extracting page #{i}"
 		next
 	end
 	puts "Converting page #{i} to ppm"
-	sh "pdftoppm #{basefn+'.pdf'} > #{basefn+'.ppm'}"
+
+	sh "pdftoppm #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
 	if not File.file?(basefn+'.ppm')
 		puts "Error while converting page #{i} to ppm"
 		next
 	end
 	puts "Running OCR on page #{i}"
 	if usecuneiform
-		sh "cuneiform -l #{language} -f hocr -o #{basefn+'.hocr'} #{basefn+'.ppm'}"
+		sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
 	else
-		sh "ocroscript recognize #{basefn+'.ppm'} > #{basefn+'.hocr'} "
+		sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
 	end
 	if not File.file?(basefn+'.hocr')
 		puts "Error while running OCR on page #{i}"
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
-	sh "hocr2pdf -i #{basefn+'.ppm'} -s -o #{basefn+'-new.pdf'} < #{basefn+'.hocr'}"
+	sh "hocr2pdf -i #{shell_escape(basefn)}.ppm -s -o #{shell_escape(basefn)}-new.pdf < #{shell_escape(basefn)}.hocr"
 	if not File.file?(basefn+'-new.pdf')
 		puts "Error while embedding text into PDF for page #{i}"
 		next
@@ -305,7 +314,7 @@ sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.pdf'}"
 
 puts "Updating PDF info for #{outfile}"
 
-sh "pdftk #{tmp+'/merged.pdf'} update_info #{tmp+'/pdfinfo.txt'} output #{outfile}"
+sh "pdftk", tmp+'/merged.pdf', "update_info", tmp+'/pdfinfo.txt', "output", outfile
 
 if deletefiles
 	puts "Cleaning up temporary files"
