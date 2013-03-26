@@ -65,7 +65,7 @@ def rmdir(dirn)
 end
 
 appname = 'pdfocr'
-version = [0,1,2]
+version = [0,1,3]
 infile = nil
 outfile = nil
 deletedir = true
@@ -74,11 +74,12 @@ language = 'eng'
 checklang = false
 tmp = nil
 usecuneiform = false
+usetesseract = false
 
 optparse = OptionParser.new { |opts|
 opts.banner = <<-eos
 Usage: #{appname} -i input.pdf -o output.pdf
-#{appname} adds text to PDF files using the cuneiform OCR software
+#{appname} adds text to PDF files using the ocropus, cuneiform, or tesseract OCR software
 eos
 
 	opts.on("-i", "--input [FILE]", "Specify input PDF file") { |fn|
@@ -93,7 +94,11 @@ eos
 		usecuneiform = true
 	}
 	
-	opts.on("-l", "--lang [LANG]", "Specify language for OCR with cuneiform") { |fn|
+	opts.on("-t", "--tesseract", "Use tesseract instead of ocropus") {
+		usetesseract = true
+	}
+	
+	opts.on("-l", "--lang [LANG]", "Specify language for the OCR software") { |fn|
 		language = fn
 		checklang = true
 	}
@@ -188,12 +193,19 @@ end
 
 if usecuneiform
 	if `which cuneiform` == ""
-		puts "cuneiform command is missing. Install the cuneiform package"
+		puts "The cuneiform command is missing. Install the cuneiform package."
+		exit
+	end
+elsif usetesseract
+	if `which tesseract` == ""
+		puts "The tesseract command is missing. Install the tesseract-ocr package and the"
+                puts "language packages you need, e.g. tesseract-ocr-deu, tesseract-ocr-deu-frak,"
+                puts "or tesseract-ocr-eng."
 		exit
 	end
 else
 	if `which ocroscript` == ""
-		puts "ocroscript command is missing. Install the ocropus package"
+		puts "The ocroscript command is missing. Install the ocropus package."
 		exit
 	end
 end
@@ -222,14 +234,24 @@ end
 
 if checklang
 	langlist = []
-	begin
-		langlist = `cuneiform -l`.split("\n")[-1].split(":")[-1].delete(".").split(" ")
-	rescue
-		puts "Unable to list supported languages from cuneiform"
+	if usecuneiform
+		begin
+			langlist = `cuneiform -l`.split("\n")[-1].split(":")[-1].delete(".").split(" ")
+		rescue
+			puts "Unable to list supported languages from cuneiform"
+		end
+	end
+	if usetesseract
+		begin
+			langlist = `tesseract --list-langs 2>&1`.split("\n")[1..-1]
+		rescue
+			puts "Unable to list supported languages from tesseract"
+		end
 	end
 	if langlist and not langlist.empty?()
 		if not langlist.include?(language)
-			puts "Language #{language} is not supported by cuneiform"
+			puts "Language #{language} is not supported or not installed. Please choose from"
+			puts langlist.join(' ')
 			exit
 		end
 	end
@@ -291,6 +313,9 @@ Dir.chdir(tmp+"/") {
 	puts "Running OCR on page #{i}"
 	if usecuneiform
 		sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
+	elsif usetesseract
+		sh "tesseract", "-l", language, basefn+'.ppm', basefn+'.hocr', "hocr"
+		sh "mv", basefn+'.hocr.html', basefn+'.hocr'
 	else
 		sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
 	end
