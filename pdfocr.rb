@@ -305,7 +305,7 @@ Dir.chdir(tmp+"/") {
 	end
 	puts "Converting page #{i} to ppm"
 
-	sh "pdftoppm #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
+	sh "pdftoppm -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
 	if not File.file?(basefn+'.ppm')
 		puts "Error while converting page #{i} to ppm"
 		next
@@ -324,7 +324,7 @@ Dir.chdir(tmp+"/") {
 		next
 	end
 	puts "Embedding text into PDF for page #{i}"
-	sh "hocr2pdf -i #{shell_escape(basefn)}.ppm -s -o #{shell_escape(basefn)}-new.pdf < #{shell_escape(basefn)}.hocr"
+	sh "hocr2pdf -r 300 -i #{shell_escape(basefn)}.ppm -s -o #{shell_escape(basefn)}-new.pdf < #{shell_escape(basefn)}.hocr"
 	if not File.file?(basefn+'-new.pdf')
 		puts "Error while embedding text into PDF for page #{i}"
 		next
