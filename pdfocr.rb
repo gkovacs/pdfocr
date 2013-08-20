@@ -275,7 +275,8 @@ end
 puts
 
 begin
-	pagenum = pdfinfo.split("\n")[-1].split(" ")[-1].to_i
+        pdfinfo =~ /NumberOfPages: (\d+)/
+	pagenum = $1.to_i
 rescue
 	puts "Error: didn't get page count for #{infile} from pdftk"
 	exit
