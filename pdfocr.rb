@@ -333,8 +333,7 @@ Dir.chdir(tmp+"/") {
   if usecuneiform
     sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
   elsif usetesseract
-    sh "tesseract", "-l", language, basefn+'.ppm', basefn+'.hocr', "hocr"
-    sh "mv", basefn+'.hocr.html', basefn+'.hocr'
+    sh "tesseract", "-l", language, basefn+'.ppm', basefn, "hocr"
   else
     sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
   end
