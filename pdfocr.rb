@@ -333,19 +333,12 @@ Dir.chdir(tmp+"/") {
   if usecuneiform
     sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
   elsif usetesseract
-    sh "tesseract", "-l", language, basefn+'.ppm', basefn+'.hocr', "hocr"
-    sh "mv", basefn+'.hocr.html', basefn+'.hocr'
+    sh "tesseract", "-l", language, basefn+'.ppm', basefn+'-new', "pdf"
   else
     sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
   end
-  if not File.file?(basefn+'.hocr')
-    puts "Error while running OCR on page #{i}"
-    next
-  end
-  puts "Embedding text into PDF for page #{i}"
-  sh "hocr2pdf -r 300 -i #{shell_escape(basefn)}.ppm -s -o #{shell_escape(basefn)}-new.pdf < #{shell_escape(basefn)}.hocr"
   if not File.file?(basefn+'-new.pdf')
-    puts "Error while embedding text into PDF for page #{i}"
+    puts "Error while running OCR on page #{i}"
     next
   end
 }
