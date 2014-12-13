@@ -107,6 +107,11 @@ eos
     language = fn
     checklang = true
   }
+
+  opts.on("-L", "--nocheck-lang LANG", "Suppress checking of language parameter") { |fn|
+    language = fn
+    checklang = false
+  }
   
   opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") { |fn|
     deletedir = false
