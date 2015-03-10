@@ -143,7 +143,7 @@ if not infile or infile == ""
   exit
 end
 
-if infile[-3..-1].casecmp("pdf") == 0
+if infile[-3..-1] != "pdf"
   puts "Input PDF file #{infile} should have a PDF extension"
   exit
 end
@@ -169,7 +169,7 @@ if not outfile or outfile == ""
   exit
 end
 
-if outfile[-3..-1].casecmp("pdf") == 0
+if outfile[-3..-1] != "pdf"
   puts "Output PDF file should have a PDF extension"
   exit
 end
