@@ -86,7 +86,7 @@ eos
   opts.on("-i", "--input [FILE]", "Specify input PDF file") { |fn|
     infile = fn
   }
-  
+
   opts.on("-o", "--output [FILE]", "Specify output PDF file") { |fn|
     outfile = fn
   }
@@ -94,7 +94,7 @@ eos
   opts.on("-t", "--tesseract", "Use tesseract as the OCR engine (default)") {
     usetesseract = true
   }
-  
+
   opts.on("-c", "--cuneiform", "Use cuneiform as the OCR engine") {
     usecuneiform = true
   }
@@ -102,7 +102,7 @@ eos
   opts.on("-p", "--ocropus", "Use ocropus as the OCR engine") {
     useocropus = true
   }
-  
+
   opts.on("-l", "--lang [LANG]", "Specify language for the OCR software") { |fn|
     language = fn
     checklang = true
@@ -112,12 +112,12 @@ eos
     language = fn
     checklang = false
   }
-  
+
   opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") { |fn|
     deletedir = false
     tmp = fn
   }
-  
+
   opts.on("-k", "--keep", "Keep temporary files around") {
     deletefiles = false
   }
@@ -143,7 +143,7 @@ if not infile or infile == ""
   exit
 end
 
-if infile[-3..-1].casecmp("pdf") == 0
+if infile[-3..-1].casecmp("pdf") != 0
   puts "Input PDF file #{infile} should have a PDF extension"
   exit
 end
@@ -169,7 +169,7 @@ if not outfile or outfile == ""
   exit
 end
 
-if outfile[-3..-1].casecmp("pdf") == 0
+if outfile[-3..-1].casecmp("pdf") != 0
   puts "Output PDF file should have a PDF extension"
   exit
 end
@@ -362,5 +362,3 @@ if deletefiles
   puts "Cleaning up temporary files"
   rmdir(tmp)
 end
-
-
