@@ -352,10 +352,12 @@ Dir.chdir(tmp+"/") {
   else
     sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
   end
-  if not File.file?(basefn+'-new.pdf')
-    puts "Error while running OCR on page #{i}"
-    next
-  end
+  if not usetesseract
+    if not File.file?(basefn+'-new.pdf')
+      puts "Error while running OCR on page #{i}"
+      next
+    end
+  end    
 }
 
 }
