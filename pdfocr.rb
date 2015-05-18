@@ -339,6 +339,16 @@ Dir.chdir(tmp+"/") {
     sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
   elsif usetesseract
     sh "tesseract", "-l", language, basefn+'.ppm', basefn+'-new', "pdf"
+    if not File.file?(basefn+'-new.pdf')
+      puts "Error while running OCR on page #{i}"
+      sh "mv #{basefn+'.pdf'}  #{basefn+'-new.pdf'}"
+    end
+    puts "Merging ..."
+    sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.ocrpdf'}"
+    sh "rm -Rf #{tmp+'/'+'*-new.pdf'}"
+    sh "rm -Rf #{tmp+'/'+'*.ppm'}"
+    sh "rm -Rf #{tmp+'/'+'*.pdf'}"
+    sh "mv #{tmp+'/merged.ocrpdf'} #{tmp+'/0000000000000-merged-new.pdf'}"
   else
     sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
   end
@@ -349,10 +359,13 @@ Dir.chdir(tmp+"/") {
 }
 
 }
-
-puts "Merging together PDF files"
-
-sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.pdf'}"
+if usetesseract
+        puts "renaming merged-new.pdf to merged.pdf"
+        sh "mv #{tmp+'/0000000000000-merged-new.pdf'} #{tmp+'/merged.pdf'}"
+elsif
+        puts "Merging together PDF files"
+        sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.pdf'}"
+end
 
 puts "Updating PDF info for #{outfile}"
 
