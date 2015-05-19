@@ -345,9 +345,9 @@ Dir.chdir(tmp+"/") {
     end
     puts "Merging ..."
     sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.ocrpdf'}"
-    sh "rm -Rf #{tmp+'/'+'*-new.pdf'}"
-    sh "rm -Rf #{tmp+'/'+'*.ppm'}"
-    sh "rm -Rf #{tmp+'/'+'*.pdf'}"
+    sh "rm -f #{tmp+'/'+'*-new.pdf'}"
+    sh "rm -f #{tmp+'/'+'*.ppm'}"
+    sh "rm -f #{tmp+'/'+'*.pdf'}"
     sh "mv #{tmp+'/merged.ocrpdf'} #{tmp+'/0000000000000-merged-new.pdf'}"
   else
     sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
