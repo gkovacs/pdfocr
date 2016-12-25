@@ -76,6 +76,7 @@ tmp = nil
 useocropus = false
 usecuneiform = false
 usetesseract = false
+runUnpaper = false
 
 optparse = OptionParser.new { |opts|
 opts.banner = <<-eos
@@ -89,6 +90,10 @@ eos
 
   opts.on("-o", "--output [FILE]", "Specify output PDF file") { |fn|
     outfile = fn
+  }
+
+  opts.on("-u", "--unpaper", "Run unpaper on each page before OCR.") {
+    runUnpaper = true
   }
 
   opts.on("-t", "--tesseract", "Use tesseract as the OCR engine (default)") {
@@ -238,6 +243,13 @@ if `which hocr2pdf` == ""
   exit
 end
 
+if runUnpaper
+  if `which unpaper` == ""
+    puts "The unpaper command is missing. Install the unpaper package."
+    exit
+  end
+end
+
 if not deletedir
   if not File.directory?(tmp)
     puts "Working directory #{tmp} does not exist"
@@ -334,6 +346,17 @@ Dir.chdir(tmp+"/") {
     puts "Error while converting page #{i} to ppm"
     next
   end
+
+  if runUnpaper
+    puts "Running unpaper on page #{i}"
+    sh "unpaper", basefn+'.ppm', basefn+'_unpaper.ppm'
+    if not File.file?(basefn+'_unpaper.ppm')
+      puts "Error while running unpaper on page #{i}"
+      next
+    end
+    sh "mv", basefn+'_unpaper.ppm', basefn+'.ppm'
+  end
+
   puts "Running OCR on page #{i}"
   if usecuneiform
     sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
