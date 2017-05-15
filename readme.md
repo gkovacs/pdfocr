@@ -10,6 +10,10 @@ pdfocr -i input.pdf -o output.pdf
 
 For more details, see the manpage.
 
+## Dependencies
+
+pdfocr requires tesseract and hocr2pdf. These can be provided by installing the packages tesseract-ocr, tesseract-ocr-eng (or other languages you need), and exactimage from your distribution.
+
 ## Credits
 
 pdfocr was written by [Geza Kovacs](http://github.com/gkovacs)
