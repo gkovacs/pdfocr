@@ -23,164 +23,166 @@
 require 'optparse'
 require 'tmpdir'
 
-def shell_escape(s)
-    "'" + s.gsub("'", "'\\''") + "'"
+def shell_escape(str)
+  "'" + str.gsub("'", "'\\''") + "'"
 end
 
-def sh(c, *args)
+def sh(cmd, *args)
   outl = []
-  if args.length > 0
-    c = shell_escape(c) + ' '
-    c << args.map {|w| shell_escape(w)}.join(' ')
+
+  unless args.empty?
+    cmd = shell_escape(cmd) + ' '
+    cmd << args.map { |w| shell_escape(w) }.join(' ')
   end
-  IO.popen(c) { |f|
-    while not f.eof?
+
+  IO.popen(cmd) do |f|
+    until f.eof?
       tval = f.gets
       puts tval
       outl.push(tval)
     end
-  }
-  return outl.join("")
+  end
+
+  outl.join('')
 end
 
-def writef(fn, c)
-  File.open(fn, "w") { |f|
-    f.puts(c)
-  }
+def writef(filename, text)
+  File.open(filename, 'w') do |f|
+    f.puts(text)
+  end
 end
 
-def rmdir(dirn)
-  Dir.foreach(dirn) { |fn|
-    if fn == "." or fn == ".."
-      next
-    end
-    fn = File.expand_path(dirn+"/"+fn)
-    if File.directory?(fn)
-      rmdir(fn)
+def rmdir(dirname)
+  Dir.foreach(dirname) do |filename|
+    next if filename.in?(['.', '..'])
+
+    filename = File.expand_path("#{dirname}/#{filename}")
+    if File.directory?(filename)
+      rmdir(filename)
     else
-      File.delete(fn)
+      File.delete(filename)
     end
-  }
-  Dir.delete(dirn)
+  end
+
+  Dir.delete(dirname)
 end
 
-appname = 'pdfocr'
-version = [0,1,4]
+app_name = 'pdfocr'
+version = [0, 1, 4]
 infile = nil
 outfile = nil
-deletedir = true
-deletefiles = true
+delete_dir = true
+delete_files = true
 language = 'eng'
-checklang = false
+check_lang = false
 tmp = nil
-useocropus = false
-usecuneiform = false
-usetesseract = false
-runUnpaper = false
+use_ocropus = false
+use_cuneiform = false
+use_tesseract = false
+run_unpaper = false
 
-optparse = OptionParser.new { |opts|
-opts.banner = <<-eos
-Usage: #{appname} -i input.pdf -o output.pdf
-#{appname} adds text to PDF files using the ocropus, cuneiform, or tesseract OCR software
-eos
+optparse = OptionParser.new do |opts|
+  opts.banner = <<~USAGE
+    Usage: #{app_name} -i input.pdf -o output.pdf
+    #{app_name} adds text to PDF files using the ocropus, cuneiform, or tesseract OCR software
+  USAGE
 
-  opts.on("-i", "--input [FILE]", "Specify input PDF file") { |fn|
+  opts.on('-i', '--input [FILE]', 'Specify input PDF file') do |fn|
     infile = fn
-  }
+  end
 
-  opts.on("-o", "--output [FILE]", "Specify output PDF file") { |fn|
+  opts.on('-o', '--output [FILE]', 'Specify output PDF file') do |fn|
     outfile = fn
-  }
+  end
 
-  opts.on("-u", "--unpaper", "Run unpaper on each page before OCR.") {
-    runUnpaper = true
-  }
+  opts.on('-u', '--unpaper', 'Run unpaper on each page before OCR.') do
+    run_unpaper = true
+  end
 
-  opts.on("-t", "--tesseract", "Use tesseract as the OCR engine (default)") {
-    usetesseract = true
-  }
+  opts.on('-t', '--tesseract', 'Use tesseract as the OCR engine (default)') do
+    use_tesseract = true
+  end
 
-  opts.on("-c", "--cuneiform", "Use cuneiform as the OCR engine") {
-    usecuneiform = true
-  }
+  opts.on('-c', '--cuneiform', 'Use cuneiform as the OCR engine') do
+    use_cuneiform = true
+  end
 
-  opts.on("-p", "--ocropus", "Use ocropus as the OCR engine") {
-    useocropus = true
-  }
+  opts.on('-p', '--ocropus', 'Use ocropus as the OCR engine') do
+    use_ocropus = true
+  end
 
-  opts.on("-l", "--lang [LANG]", "Specify language for the OCR software") { |fn|
+  opts.on('-l', '--lang [LANG]', 'Specify language for the OCR software') do |fn|
     language = fn
-    checklang = true
-  }
+    check_lang = true
+  end
 
-  opts.on("-L", "--nocheck-lang LANG", "Suppress checking of language parameter") { |fn|
+  opts.on('-L', '--nocheck-lang LANG', 'Suppress checking of language parameter') do |fn|
     language = fn
-    checklang = false
-  }
+    check_lang = false
+  end
 
-  opts.on("-w", "--workingdir [DIR]", "Specify directory to store temp files in") { |fn|
-    deletedir = false
+  opts.on('-w', '--workingdir [DIR]', 'Specify directory to store temp files in') do |fn|
+    delete_dir = false
     tmp = fn
-  }
+  end
 
-  opts.on("-k", "--keep", "Keep temporary files around") {
-    deletefiles = false
-  }
+  opts.on('-k', '--keep', 'Keep temporary files around') do
+    delete_files = false
+  end
 
-  opts.on_tail("-h", "--help", "Show this message") {
+  opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
-  }
+  end
 
-  opts.on_tail("-v", "--version", "Show version") {
+  opts.on_tail('-v', '--version', 'Show version') do
     puts version.join('.')
     exit
-  }
-
-}
+  end
+end
 
 optparse.parse!(ARGV)
 
-if not infile or infile == ""
+if !infile || infile == ''
   puts optparse
   puts
-  puts "Need to specify an input PDF file"
+  puts 'Need to specify an input PDF file'
   exit
 end
 
-if infile[-3..-1].casecmp("pdf") != 0
+if infile[-3..-1].casecmp('pdf') != 0
   puts "Input PDF file #{infile} should have a PDF extension"
   exit
 end
 
-#baseinfile = infile[0..-5]
+# baseinfile = infile[0..-5]
 
-#if not baseinfile or baseinfile == ""
-#  puts "Input file #{infile} needs to have a name, not just an extension"
-#  exit
-#end
+# if not baseinfile or baseinfile == ''
+#   puts "Input file #{infile} needs to have a name, not just an extension"
+#   exit
+# end
 
-if not File.file?(infile)
+unless File.file?(infile)
   puts "Input file #{infile} does not exist"
   exit
 end
 
 infile = File.expand_path(infile)
 
-if not outfile or outfile == ""
+if !outfile || outfile == ''
   puts optparse
   puts
-  puts "Need to specify an output PDF file"
+  puts 'Need to specify an output PDF file'
   exit
 end
 
-if outfile[-3..-1].casecmp("pdf") != 0
-  puts "Output PDF file should have a PDF extension"
+if outfile[-3..-1].casecmp('pdf') != 0
+  puts 'Output PDF file should have a PDF extension'
   exit
 end
 
 if outfile == infile
-  puts "Output PDF file should not be the same as the input PDF file"
+  puts 'Output PDF file should not be the same as the input PDF file'
   exit
 end
 
@@ -191,100 +193,98 @@ end
 
 outfile = File.expand_path(outfile)
 
-if not language or language == ""
-  puts "Need to specify a language"
+if !language || language == ''
+  puts 'Need to specify a language'
   exit
 end
 
-if `which pdftk` == ""
-  puts "pdftk command is missing. Install the pdftk package"
+if `which pdftk` == ''
+  puts 'pdftk command is missing. Install the pdftk package'
   exit
 end
 
-if `which pdftoppm` == ""
-  puts "pdftoppm command is missing. Install the poppler-utils package"
+if `which pdftoppm` == ''
+  puts 'pdftoppm command is missing. Install the poppler-utils package'
   exit
 end
 
-if useocropus
-  if `which ocroscript` == ""
-    puts "The ocroscript command is missing. Install the ocropus package."
+if use_ocropus
+  if `which ocroscript` == ''
+    puts 'The ocroscript command is missing. Install the ocropus package.'
     exit
   end
-elsif usecuneiform
-  if `which cuneiform` == ""
-    puts "The cuneiform command is missing. Install the cuneiform package."
+elsif use_cuneiform
+  if `which cuneiform` == ''
+    puts 'The cuneiform command is missing. Install the cuneiform package.'
     exit
   end
-elsif usetesseract
-  if `which tesseract` == ""
-    puts "The tesseract command is missing. Install the tesseract-ocr package and the"
-    puts "language packages you need, e.g. tesseract-ocr-deu, tesseract-ocr-deu-frak,"
-    puts "or tesseract-ocr-eng."
+elsif use_tesseract
+  if `which tesseract` == ''
+    puts 'The tesseract command is missing. Install the tesseract-ocr package and the'
+    puts 'language packages you need, e.g. tesseract-ocr-deu, tesseract-ocr-deu-frak,'
+    puts 'or tesseract-ocr-eng.'
     exit
   end
 else
-  if `which tesseract` != ""
-    usetesseract = true
-  elsif `which cuneiform` != ""
-    usecuneiform = true
-  elsif `which ocroscript` != ""
-    useocropus = true
+  if `which tesseract` != ''
+    use_tesseract = true
+  elsif `which cuneiform` != ''
+    use_cuneiform = true
+  elsif `which ocroscript` != ''
+    use_ocropus = true
   else
-    puts "The tesseract command is missing. Install the tesseract-ocr package and the"
-    puts "language packages you need, e.g. tesseract-ocr-deu, tesseract-ocr-deu-frak,"
-    puts "or tesseract-ocr-eng."
+    puts 'The tesseract command is missing. Install the tesseract-ocr package and the'
+    puts 'language packages you need, e.g. tesseract-ocr-deu, tesseract-ocr-deu-frak,'
+    puts 'or tesseract-ocr-eng.'
     exit
   end
 end
 
-if `which hocr2pdf` == ""
-  puts "hocr2pdf command is missing. Install the exactimage package"
+if `which hocr2pdf` == ''
+  puts 'hocr2pdf command is missing. Install the exactimage package'
   exit
 end
 
-if runUnpaper
-  if `which unpaper` == ""
-    puts "The unpaper command is missing. Install the unpaper package."
+if run_unpaper
+  if `which unpaper` == ''
+    puts 'The unpaper command is missing. Install the unpaper package.'
     exit
   end
 end
 
-if not deletedir
-  if not File.directory?(tmp)
-    puts "Working directory #{tmp} does not exist"
-    exit
-  else
-    tmp = File.expand_path(tmp)+"/pdfocr"
-    if File.directory?(tmp)
-      puts "Directory #{tmp} already exists - remove it"
-      exit
-    else
-      Dir.mkdir(tmp)
-    end
-  end
-else
+if delete_dir
   tmp = Dir.mktmpdir
+elsif File.directory?(tmp)
+  tmp = "#{File.expand_path(tmp)}/pdfocr"
+  if File.directory?(tmp)
+    puts "Directory #{tmp} already exists - remove it"
+    exit
+  else
+    Dir.mkdir(tmp)
+  end
+else
+  puts "Working directory #{tmp} does not exist"
+  exit
 end
 
-if checklang
+if check_lang
   langlist = []
-  if usecuneiform
+  if use_cuneiform
     begin
-      langlist = `cuneiform -l`.split("\n")[-1].split(":")[-1].delete(".").split(" ")
+      langlist = `cuneiform -l`.split("\n")[-1].split(':')[-1].delete('.').split(' ')
     rescue
-      puts "Unable to list supported languages from cuneiform"
+      puts 'Unable to list supported languages from cuneiform'
     end
   end
-  if usetesseract
+  if use_tesseract
     begin
       langlist = `tesseract --list-langs 2>&1`.split("\n")[1..-1]
     rescue
-      puts "Unable to list supported languages from tesseract"
+      puts 'Unable to list supported languages from tesseract'
     end
   end
-  if langlist and not langlist.empty?()
-    if not langlist.include?(language)
+  if langlist && !langlist.empty?
+    unless langlist.include?(language)
       puts "Language #{language} is not supported or not installed. Please choose from"
       puts langlist.join(' ')
       exit
@@ -296,13 +296,13 @@ puts "Input file is #{infile}"
 puts "Output file is #{outfile}"
 puts "Using working dir #{tmp}"
 
-puts "Getting info from PDF file"
+puts 'Getting info from PDF file'
 
 puts
 
-pdfinfo = sh "pdftk", infile, "dump_data"
+pdfinfo = sh 'pdftk', infile, 'dump_data'
 
-if not pdfinfo or pdfinfo == ""
+if !pdfinfo || pdfinfo == ''
   puts "Error: didn't get info from pdftk #{infile} dump_data"
   exit
 end
@@ -311,92 +311,92 @@ puts
 
 begin
   pdfinfo =~ /NumberOfPages: (\d+)/
-  pagenum = $1.to_i
+  pagenum = Regexp.last_match(1).to_i
 rescue
   puts "Error: didn't get page count for #{infile} from pdftk"
   exit
 end
 
-if pagenum == 0
+if pagenum.zero?
   puts "Error: there are 0 pages in the input PDF file #{infile}"
   exit
 end
 
-writef(tmp+"/pdfinfo.txt", pdfinfo)
+writef("#{tmp}/pdfinfo.txt", pdfinfo)
 
 puts "Converting #{pagenum} pages"
 
 numdigits = pagenum.to_s.length
 
-Dir.chdir(tmp+"/") {
-
-1.upto(pagenum) { |i|
-  puts "=========="
-  puts "Extracting page #{i}"
-  basefn = i.to_s.rjust(numdigits, '0')
-  sh "pdftk", infile, "cat", "#{i}", "output", basefn+'.pdf'
-  if not File.file?(basefn+'.pdf')
-    puts "Error while extracting page #{i}"
-    next
-  end
-  puts "Converting page #{i} to ppm"
-
-  sh "pdftoppm -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
-  if not File.file?(basefn+'.ppm')
-    puts "Error while converting page #{i} to ppm"
-    next
-  end
-
-  if runUnpaper
-    puts "Running unpaper on page #{i}"
-    sh "unpaper", basefn+'.ppm', basefn+'_unpaper.ppm'
-    if not File.file?(basefn+'_unpaper.ppm')
-      puts "Error while running unpaper on page #{i}"
+Dir.chdir("#{tmp}/") do
+  1.upto(pagenum) do |i|
+    puts '=========='
+    puts "Extracting page #{i}"
+    basefn = i.to_s.rjust(numdigits, '0')
+    sh 'pdftk', infile, 'cat', i.to_s, 'output', "#{basefn}.pdf"
+    unless File.file?("#{basefn}.pdf")
+      puts "Error while extracting page #{i}"
       next
     end
-    sh "mv", basefn+'_unpaper.ppm', basefn+'.ppm'
-  end
+    puts "Converting page #{i} to ppm"
 
-  puts "Running OCR on page #{i}"
-  if usecuneiform
-    sh "cuneiform", "-l", language, "-f", "hocr", "-o", basefn+'.hocr', basefn+'.ppm'
-  elsif usetesseract
-    sh "tesseract", "-l", language, basefn+'.ppm', basefn+'-new', "pdf"
-    if not File.file?(basefn+'-new.pdf')
-      puts "Error while running OCR on page #{i}"
-      sh "mv #{basefn+'.pdf'}  #{basefn+'-new.pdf'}"
+    sh "pdftoppm -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
+    unless File.file?("#{basefn}.ppm")
+      puts "Error while converting page #{i} to ppm"
+      next
     end
-    puts "Merging ..."
-    sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.ocrpdf'}"
-    sh "rm -f #{tmp+'/'+'*-new.pdf'}"
-    sh "rm -f #{tmp+'/'+'*.ppm'}"
-    sh "rm -f #{tmp+'/'+'*.pdf'}"
-    sh "mv #{tmp+'/merged.ocrpdf'} #{tmp+'/0000000000000-merged-new.pdf'}"
-  else
-    sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
-  end
-  if not usetesseract
-    if not File.file?(basefn+'-new.pdf')
+
+    if run_unpaper
+      puts "Running unpaper on page #{i}"
+      sh 'unpaper', "#{basefn}.ppm", "#{basefn}_unpaper.ppm"
+      unless File.file?("#{basefn}_unpaper.ppm")
+        puts "Error while running unpaper on page #{i}"
+        next
+      end
+      sh 'mv', "#{basefn}_unpaper.ppm", "#{basefn}.ppm"
+    end
+
+    puts "Running OCR on page #{i}"
+    if use_cuneiform
+      sh 'cuneiform', '-l', language, '-f', 'hocr', '-o', "#{basefn}.hocr", "#{basefn}.ppm"
+    elsif use_tesseract
+      sh 'tesseract', '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
+      unless File.file?("#{basefn}-new.pdf")
+        puts "Error while running OCR on page #{i}"
+        sh 'mv', "#{basefn}.pdf", "#{basefn}-new.pdf"
+      end
+      puts 'Merging ...'
+      sh "pdftk #{tmp + '/' + '*-new.pdf'} cat output #{tmp + '/merged.ocrpdf'}"
+      sh "rm -f #{tmp + '/' + '*-new.pdf'}"
+      sh "rm -f #{tmp + '/' + '*.ppm'}"
+      sh "rm -f #{tmp + '/' + '*.pdf'}"
+      sh "mv #{tmp + '/merged.ocrpdf'} #{tmp + '/0000000000000-merged-new.pdf'}"
+    else
+      sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
+    end
+
+    next if use_tesseract
+
+    unless File.file?("#{basefn}-new.pdf")
       puts "Error while running OCR on page #{i}"
       next
     end
-  end    
-}
+  end
+end
 
-}
-if usetesseract
-        puts "renaming merged-new.pdf to merged.pdf"
-        sh "mv #{tmp+'/0000000000000-merged-new.pdf'} #{tmp+'/merged.pdf'}"
-elsif
-        puts "Merging together PDF files"
-        sh "pdftk #{tmp+'/'+'*-new.pdf'} cat output #{tmp+'/merged.pdf'}"
+if use_tesseract
+  puts 'renaming merged-new.pdf to merged.pdf'
+  sh 'mv', "#{tmp}/0000000000000-merged-new.pdf", "#{tmp}/merged.pdf"
+elsif # TODO: Figure out what this line is supposed to do.
+  puts 'Merging together PDF files'
+  sh 'pdftk', "#{tmp}/*-new.pdf", 'cat', 'output', "#{tmp}/merged.pdf"
 end
 
 puts "Updating PDF info for #{outfile}"
 
-sh "pdftk", tmp+'/merged.pdf', "update_info", tmp+'/pdfinfo.txt', "output", outfile
+sh 'pdftk', "#{tmp}/merged.pdf", 'update_info', "#{tmp}/pdfinfo.txt", 'output', outfile
 
-if deletefiles
-  puts "Cleaning up temporary files"
+if delete_files
+  puts 'Cleaning up temporary files'
   rmdir(tmp)
 end
