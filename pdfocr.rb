@@ -387,7 +387,7 @@ end
 if use_tesseract
   puts 'renaming merged-new.pdf to merged.pdf'
   sh 'mv', "#{tmp}/0000000000000-merged-new.pdf", "#{tmp}/merged.pdf"
-elsif # TODO: Figure out what this line is supposed to do.
+else
   puts 'Merging together PDF files'
   sh 'pdftk', "#{tmp}/*-new.pdf", 'cat', 'output', "#{tmp}/merged.pdf"
 end
