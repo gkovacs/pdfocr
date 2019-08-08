@@ -54,7 +54,7 @@ end
 
 def rmdir(dirname)
   Dir.foreach(dirname) do |filename|
-    next if filename.in?(['.', '..'])
+    next if ['.', '..'].include?(filename)
 
     filename = File.expand_path("#{dirname}/#{filename}")
     if File.directory?(filename)
