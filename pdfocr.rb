@@ -340,7 +340,7 @@ Dir.chdir("#{tmp}/") do
     end
     puts "Converting page #{i} to ppm"
 
-    sh "pdftoppm -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
+    sh "pdftoppm -cropbox -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
     unless File.file?("#{basefn}.ppm")
       puts "Error while converting page #{i} to ppm"
       next
