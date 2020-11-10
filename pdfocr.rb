@@ -80,6 +80,7 @@ use_ocropus = false
 use_cuneiform = false
 use_tesseract = false
 run_unpaper = false
+outdpi = '300' # Use string, since this is input to commands anyway
 
 optparse = OptionParser.new do |opts|
   opts.banner = <<~USAGE
@@ -138,6 +139,10 @@ optparse = OptionParser.new do |opts|
   opts.on_tail('-v', '--version', 'Show version') do
     puts version.join('.')
     exit
+  end
+
+  opts.on('--dpi DPI', 'Set OCR and output resolution in DPI. Useful to reduce PDF size') do |fn|
+    outdpi = fn
   end
 end
 
@@ -340,7 +345,7 @@ Dir.chdir("#{tmp}/") do
     end
     puts "Converting page #{i} to ppm"
 
-    sh "pdftoppm -cropbox -r 300 #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
+    sh "pdftoppm -cropbox -r #{outdpi} #{shell_escape(basefn)}.pdf >#{shell_escape(basefn)}.ppm"
     unless File.file?("#{basefn}.ppm")
       puts "Error while converting page #{i} to ppm"
       next
@@ -360,7 +365,7 @@ Dir.chdir("#{tmp}/") do
     if use_cuneiform
       sh 'cuneiform', '-l', language, '-f', 'hocr', '-o', "#{basefn}.hocr", "#{basefn}.ppm"
     elsif use_tesseract
-      sh 'tesseract', '--dpi', '300', '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
+      sh 'tesseract', '--dpi', outdpi, '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
       unless File.file?("#{basefn}-new.pdf")
         puts "Error while running OCR on page #{i}"
         puts "Input page will be added to output without OCR."
