@@ -363,14 +363,9 @@ Dir.chdir("#{tmp}/") do
       sh 'tesseract', '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
       unless File.file?("#{basefn}-new.pdf")
         puts "Error while running OCR on page #{i}"
+        puts "Input page will be added to output without OCR."
         sh 'mv', "#{basefn}.pdf", "#{basefn}-new.pdf"
       end
-      puts 'Merging ...'
-      sh "pdftk #{tmp + '/' + '*-new.pdf'} cat output #{tmp + '/merged.ocrpdf'}"
-      sh "rm -f #{tmp + '/' + '*-new.pdf'}"
-      sh "rm -f #{tmp + '/' + '*.ppm'}"
-      sh "rm -f #{tmp + '/' + '*.pdf'}"
-      sh "mv #{tmp + '/merged.ocrpdf'} #{tmp + '/0000000000000-merged-new.pdf'}"
     else
       sh "ocroscript recognize #{shell_escape(basefn)}.ppm > #{shell_escape(basefn)}.hocr"
     end
@@ -384,13 +379,8 @@ Dir.chdir("#{tmp}/") do
   end
 end
 
-if use_tesseract
-  puts 'renaming merged-new.pdf to merged.pdf'
-  sh 'mv', "#{tmp}/0000000000000-merged-new.pdf", "#{tmp}/merged.pdf"
-else
-  puts 'Merging together PDF files'
-  sh 'pdftk', "#{tmp}/*-new.pdf", 'cat', 'output', "#{tmp}/merged.pdf"
-end
+puts 'Merging together PDF files'
+sh "pdftk \"#{tmp}/\"*-new.pdf cat output \"#{tmp}/merged.pdf\""
 
 puts "Updating PDF info for #{outfile}"
 
