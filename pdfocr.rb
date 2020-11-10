@@ -360,7 +360,7 @@ Dir.chdir("#{tmp}/") do
     if use_cuneiform
       sh 'cuneiform', '-l', language, '-f', 'hocr', '-o', "#{basefn}.hocr", "#{basefn}.ppm"
     elsif use_tesseract
-      sh 'tesseract', '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
+      sh 'tesseract', '--dpi', '300', '-l', language, "#{basefn}.ppm", "#{basefn}-new", 'pdf'
       unless File.file?("#{basefn}-new.pdf")
         puts "Error while running OCR on page #{i}"
         puts "Input page will be added to output without OCR."
